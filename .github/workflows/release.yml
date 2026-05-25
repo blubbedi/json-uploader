@@ -18,9 +18,8 @@ jobs:
       id: get_version
       run: echo "VERSION=$(node -p "require('./module.json').version")" >> $GITHUB_ENV
 
-    # Packt ALLES im Ordner ein, schließt aber Git und die Workflows selbst aus
-    # Dadurch landen module.json und main.js GARANTIERT zusammen im ZIP
-    name: Create Perfect Zip
+    # JETZT REPARIERT: Mit Bindestrich am Anfang der Zeile
+    - name: Create Perfect Zip
       run: |
         zip -r ./module.zip . -x "*.git*" ".github*"
 
