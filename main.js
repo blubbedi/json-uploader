@@ -10,8 +10,8 @@ Hooks.once('init', () => {
     if (source._id === "79NslkwJDqDkjTd6" && source.system?.target?.template?.size === "9m") {
       source.system.target.template.size = 9;
     }
-    if (source._id === "0cZmtnAIKAjvygU6") {
-      if (source.system) source.system.activities = {};
+    if (source._id === "0cZmtnAIKAjvygU6" && source.system) {
+      source.system.activities = {};
     }
     return originalFromSource.call(this, source, options);
   };
@@ -37,17 +37,12 @@ Hooks.once('init', () => {
   });
 });
 
-// --- UI-INJEKTION (BRUTAL-MODE FÜR V14) ---
-Hooks.on('renderSceneControls', (controlsApp, html) => {
+// --- UI-INJEKTION (KOMBINIERTER METHODEN-MIX FÜR V14) ---
+Hooks.on('getSceneControlButtons', (controls) => {
   if (!game.user.isGM) return;
 
-  const controlsStructure = controlsApp.controls;
-  if (!controlsStructure) return;
-
-  const list = typeof controlsStructure.values === 'function' 
-    ? Array.from(controlsStructure.values()) 
-    : Object.values(controlsStructure);
-
+  // Offizieller Foundry-Weg: Erlaubt das native Registrieren des Tools
+  const list = Array.isArray(controls) ? controls : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
   const tokenControls = list.find(c => c.name === "token");
   
   if (tokenControls && tokenControls.tools) {
@@ -63,12 +58,19 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
       });
     }
   }
+});
 
-  // Sicherheitsnetz: Wir injizieren den Button direkt per DOM-Manipulation in die Leiste,
-  // falls Foundry wegen anderer Modul-Fehler das Neu-Rendern verweigert!
+Hooks.on('renderSceneControls', (controlsApp, html) => {
+  if (!game.user.isGM) return;
+
+  // Absolutes V14-Sicherheitsnetz per direktem DOM-Eingriff
   setTimeout(() => {
-    const subNav = document.querySelector('.main-controls [data-control="token"] .sub-controls');
-    if (subNav && !document.querySelector('[data-tool="json-uploader"]')) {
+    if (document.querySelector('[data-tool="json-uploader"]')) return;
+
+    // Foundry V14 nutzt flexiblere UI-Strukturen. Wir suchen nach dem Token-Untermenü:
+    const subNav = document.querySelector('[data-control="token"] .sub-controls, [data-control="token"] .control-tools, [data-control="token"] ul');
+    
+    if (subNav) {
       const activeClass = controlsApp.activeTool === "json-uploader" ? "active" : "";
       const buttonHtml = `
         <li class="control-tool ${activeClass}" data-tool="json-uploader" title="Ordner-Inhalt hochladen">
@@ -77,7 +79,6 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
       `;
       subNav.insertAdjacentHTML('beforeend', buttonHtml);
       
-      // Event-Listener an das frisch erzwungene Icon hängen
       const btnElement = subNav.querySelector('[data-tool="json-uploader"]');
       if (btnElement) {
         btnElement.addEventListener('click', (ev) => {
@@ -86,7 +87,7 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
         });
       }
     }
-  }, 100);
+  }, 150);
 });
 
 // Offizielle Foundry V14 ApplicationV2 Implementierung
