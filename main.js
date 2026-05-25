@@ -1,4 +1,30 @@
+// --- AUTO-REPARATUR FÜR KAPUTTE WELT-DATA-MODELS (V14) ---
+// Wir klinken uns extrem früh ein, um die Blockade des dnd5e-Systems im Keim zu ersticken.
+Hooks.on('preCreateItem', (document, data, options, userId) => {
+  // Falls die Items neu erstellt/importiert werden
+  if (document.id === "79NslkwJDqDkjTd6") {
+    document.updateSource({"system.target.template.size": 9});
+  }
+  if (document.id === "0cZmtnAIKAjvygU6") {
+    document.updateSource({"system.activities.dnd5eactivity000.roll.formula": "1d6"});
+  }
+});
+
+// Abfangen beim ersten Laden der Kollektionen aus der Datenbank
 Hooks.once('init', () => {
+  const originalFromSource = CONFIG.Item.documentClass.fromSource;
+  CONFIG.Item.documentClass.fromSource = function(source, options={}) {
+    if (source._id === "79NslkwJDqDkjTd6" && source.system?.target?.template?.size === "9m") {
+      source.system.target.template.size = 9;
+      console.log("JSON-Uploader: Kaputtes Template-Size Item im RAM geflickt!");
+    }
+    if (source._id === "0cZmtnAIKAjvygU6" && source.system?.activities?.dnd5eactivity000?.roll?.formula === "G") {
+      source.system.activities.dnd5eactivity000.roll.formula = "1d6";
+      console.log("JSON-Uploader: Kaputte Würfelformel im RAM geflickt!");
+    }
+    return originalFromSource.call(this, source, options);
+  };
+
   // Socket-Registrierung bleibt absolut identisch
   game.socket.on('module.json-uploader', async (data) => {
     if (!game.user.isGM) return;
@@ -20,16 +46,13 @@ Hooks.once('init', () => {
   });
 });
 
-// Das absolute Sicherheitsnetz für V14: 
-// Jedes Mal, wenn Foundry die Steuerelemente zeichnet oder aktualisiert, 
-// klinken wir uns ein – völlig unabhängig davon, was andere Module davor getan haben.
+// --- UI INJEKTION ---
 Hooks.on('renderSceneControls', (controlsApp, html) => {
   if (!game.user.isGM) return;
 
   const controlsStructure = controlsApp.controls;
   if (!controlsStructure) return;
 
-  // Sicherstellen, dass wir eine durchsuchbare Liste haben
   const list = typeof controlsStructure.values === 'function' 
     ? Array.from(controlsStructure.values()) 
     : Object.values(controlsStructure);
@@ -48,12 +71,9 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
         button: true
       });
       
-      // Drücke das Icon direkt in das bereits gerenderte HTML-Element der UI, 
-      // falls Foundry das automatische Update verschläft.
       setTimeout(() => {
         const subNav = document.querySelector('.main-controls [data-control="token"]');
         if (subNav && !document.querySelector('[data-tool="json-uploader"]')) {
-          // Zwingt die UI zu einem sauberen Refresh der Icons
           controlsApp.render(false);
         }
       }, 50);
@@ -61,7 +81,7 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
   }
 });
 
-// Offizielle Foundry V14 ApplicationV2 Implementierung (Bleibt perfekt)
+// Offizielle Foundry V14 ApplicationV2 Implementierung
 class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   constructor(options={}) {
     super(options);
