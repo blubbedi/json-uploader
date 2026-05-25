@@ -3,7 +3,7 @@ name: Release Creation
 on:
   push:
     tags:
-      - 'v*' # Reagiert automatisch, wenn ein Tag hochgeladen wird (z.B. v1.0.2)
+      - 'v*'
 
 jobs:
   build:
@@ -14,15 +14,15 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    - name: Get Version
-      id: get_version
-      run: echo "VERSION=$(node -p "require('./module.json').version")" >> $GITHUB_ENV
+    # Nutzt ein offizielles GitHub-Tool zum sauberen Zippen ohne versteckte Unterordner
+    - name: Missing Files Fix (Zip)
+      uses: theunites/zip-action@v2.2.0
+      with:
+        files: |
+          module.json
+          main.js
+        dest: ./json-uploader.zip
 
-    - name: Zip Files
-      run: |
-        zip -r ./json-uploader.zip module.json main.js
-
-    # Erstellt jetzt das Release AUTOMATISCH und lädt die Dateien hoch
     - name: Create and Update Release
       uses: softprops/action-gh-release@v2
       with:
