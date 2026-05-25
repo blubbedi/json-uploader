@@ -1,3 +1,4 @@
+// VERSION 1.3.1 - SYNTAX FIX
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
