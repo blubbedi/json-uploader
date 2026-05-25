@@ -19,18 +19,34 @@ Hooks.once('init', () => {
   });
 });
 
+// Extrem toleranter Hook für Foundry V14
 Hooks.on('getSceneControlButtons', (controls) => {
   if (!game.user.isGM) return;
-  const tokenControls = controls.find(c => c.name === "token");
-  if (tokenControls) {
-    tokenControls.tools.push({
-      name: "json-uploader",
-      title: "Ordner-Inhalt hochladen",
-      icon: "fas fa-folder-plus",
-      visible: true,
-      onClick: () => { new JSONUploaderForm().render(true); },
-      button: true
-    });
+
+  let tokenControls = null;
+
+  // V14-Sicherheitsnetz: Wir prüfen alle möglichen Datenstrukturen (Array, Objekt, Collection)
+  if (Array.isArray(controls)) {
+    tokenControls = controls.find(c => c.name === "token");
+  } else if (controls && typeof controls === 'object') {
+    // Falls es ein nacktes Objekt oder eine Foundry Collection/Map ist
+    const values = typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls);
+    tokenControls = values.find(c => c.name === "token");
+  }
+
+  if (tokenControls && tokenControls.tools) {
+    // Verhindern, dass der Button doppelt hinzugefügt wird
+    const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
+    if (!alreadyExists) {
+      tokenControls.tools.push({
+        name: "json-uploader",
+        title: "Ordner-Inhalt hochladen",
+        icon: "fas fa-folder-plus",
+        visible: true,
+        onClick: () => { new JSONUploaderForm().render(true); },
+        button: true
+      });
+    }
   }
 });
 
