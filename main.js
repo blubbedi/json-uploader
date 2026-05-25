@@ -1,4 +1,4 @@
-// VERSION 1.3.4 - ASYNC TIMING & DOM INJECTION FIX
+// VERSION 1.3.5 - REKURSIVER DOM OBSERVER FIX
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
@@ -42,7 +42,7 @@ Hooks.once('init', () => {
   });
 });
 
-// --- UI-INJEKTION (NATIVE & REAKTIVE STRATEGIE) ---
+// --- UI-INJEKTION VIA NATIVE HOOKS ---
 const injectUploaderButton = (controls) => {
   if (!game.user.isGM || !controls) return;
   const list = Array.isArray(controls) ? controls : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
@@ -65,20 +65,18 @@ const injectUploaderButton = (controls) => {
 Hooks.on("initializeSceneControls", (controls) => injectUploaderButton(controls));
 Hooks.on("getSceneControlButtons", (controls) => injectUploaderButton(controls));
 
-// Der reaktive DOM-Injektor: Falls Foundry das Icon beim asynchronen Laden vergisst,
-// drücken wir es hart in das gerenderte HTML-Element, sobald das Token-Menü aktiv ist.
-Hooks.on('renderSceneControls', (controlsApp, html) => {
+// --- DER UNZERSTÖRBARE MUTATION OBSERVER (V14) ---
+// Überwacht den HTML-Körper der Foundry-Leiste. Wenn dnd5e uns löscht, injizieren wir sofort nach.
+Hooks.once('ready', () => {
   if (!game.user.isGM) return;
 
-  const performInjection = () => {
+  const forceButtonInjection = () => {
     if (document.querySelector('[data-tool="json-uploader"]')) return;
 
-    // In V14 suchen wir die aktive Werkzeugleiste für Token-Steuerelemente
     const subNav = document.querySelector('.main-controls [data-control="token"] ol.sub-controls, [data-control="token"] .sub-controls, [data-control="token"] ul');
     if (subNav) {
-      const activeClass = controlsApp.activeTool === "json-uploader" ? "active" : "";
       const buttonHtml = `
-        <li class="control-tool ${activeClass}" data-tool="json-uploader" title="Ordner-Inhalt hochladen">
+        <li class="control-tool" data-tool="json-uploader" title="Ordner-Inhalt hochladen">
           <i class="fas fa-folder-plus"></i>
         </li>
       `;
@@ -95,11 +93,16 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
     }
   };
 
-  // Wir führen es sofort aus und setzen zusätzlich einen kurzen Intervall-Sicherheitsanker,
-  // um asynchrone Overrides durch schwere Grafik- oder UI-Module abzufangen.
-  performInjection();
-  setTimeout(performInjection, 200);
-  setTimeout(performInjection, 750);
+  // Starte den Wächter auf dem Interface-Layer von Foundry
+  const observer = new MutationObserver(() => forceButtonInjection());
+  const uiControlsElement = document.getElementById('ui-left');
+  
+  if (uiControlsElement) {
+    observer.observe(uiControlsElement, { childList: true, subtree: true });
+  }
+  
+  // Erstinjektion zur Sicherheit
+  forceButtonInjection();
 });
 
 // Offizielle Foundry V14 ApplicationV2 Implementierung
