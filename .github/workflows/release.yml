@@ -7,6 +7,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # ZWINGEND ERFORDERLICH, damit GitHub die Dateien hochladen darf
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -15,11 +17,9 @@ jobs:
       id: get_version
       run: echo "VERSION=$(node -p "require('./module.json').version")" >> $GITHUB_ENV
 
-    # Wechselt direkt in das Verzeichnis und zippt nur die nackten Dateien auf Root-Ebene
     - name: Zip Files
       run: |
         zip -r ./json-uploader.zip module.json main.js
-        # Falls du Styles oder andere Ordner hättest, würden sie hier dazukommen
 
     - name: Update Release Assets
       uses: softprops/action-gh-release@v2
