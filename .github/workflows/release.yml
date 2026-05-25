@@ -14,15 +14,16 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # Nutzt ein offizielles GitHub-Tool zum sauberen Zippen ohne versteckte Unterordner
+    # Packt die Dateien flach direkt als module.zip
     - name: Missing Files Fix (Zip)
       uses: theunites/zip-action@v2.2.0
       with:
         files: |
           module.json
           main.js
-        dest: ./json-uploader.zip
+        dest: ./module.zip
 
+    # Erstellt das Release und lädt module.json sowie module.zip hoch
     - name: Create and Update Release
       uses: softprops/action-gh-release@v2
       with:
@@ -32,6 +33,6 @@ jobs:
         prerelease: false
         files: |
           ./module.json
-          ./json-uploader.zip
+          ./module.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
