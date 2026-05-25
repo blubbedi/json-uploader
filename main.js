@@ -5,6 +5,10 @@ Hooks.on('preCreateItem', (document, data, options, userId) => {
 });
 
 Hooks.once('init', () => {
+  console.log("========================================");
+  console.log("JSON-UPLOADER: MODUL ERFOLGREICH GESTARTET!");
+  console.log("========================================");
+
   const originalFromSource = CONFIG.Item.documentClass.fromSource;
   CONFIG.Item.documentClass.fromSource = function(source, options={}) {
     if (source._id === "79NslkwJDqDkjTd6" && source.system?.target?.template?.size === "9m") {
@@ -16,7 +20,6 @@ Hooks.once('init', () => {
     return originalFromSource.call(this, source, options);
   };
 
-  // Socket-Registrierung bleibt identisch
   game.socket.on('module.json-uploader', async (data) => {
     if (!game.user.isGM) return;
     if (data.action === "uploadMultiple") {
@@ -40,11 +43,8 @@ Hooks.once('init', () => {
 // --- UI-INJEKTION (KOMBINIERTER METHODEN-MIX FÜR V14) ---
 Hooks.on('getSceneControlButtons', (controls) => {
   if (!game.user.isGM) return;
-
-  // Offizieller Foundry-Weg: Erlaubt das native Registrieren des Tools
   const list = Array.isArray(controls) ? controls : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
   const tokenControls = list.find(c => c.name === "token");
-  
   if (tokenControls && tokenControls.tools) {
     const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
     if (!alreadyExists) {
@@ -62,14 +62,9 @@ Hooks.on('getSceneControlButtons', (controls) => {
 
 Hooks.on('renderSceneControls', (controlsApp, html) => {
   if (!game.user.isGM) return;
-
-  // Absolutes V14-Sicherheitsnetz per direktem DOM-Eingriff
   setTimeout(() => {
     if (document.querySelector('[data-tool="json-uploader"]')) return;
-
-    // Foundry V14 nutzt flexiblere UI-Strukturen. Wir suchen nach dem Token-Untermenü:
     const subNav = document.querySelector('[data-control="token"] .sub-controls, [data-control="token"] .control-tools, [data-control="token"] ul');
-    
     if (subNav) {
       const activeClass = controlsApp.activeTool === "json-uploader" ? "active" : "";
       const buttonHtml = `
@@ -78,7 +73,6 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
         </li>
       `;
       subNav.insertAdjacentHTML('beforeend', buttonHtml);
-      
       const btnElement = subNav.querySelector('[data-tool="json-uploader"]');
       if (btnElement) {
         btnElement.addEventListener('click', (ev) => {
@@ -90,16 +84,13 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
   }, 150);
 });
 
-// Offizielle Foundry V14 ApplicationV2 Implementierung
 class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   constructor(options={}) { super(options); }
-
   static DEFAULT_OPTIONS = {
     id: "json-uploader-form",
     window: { title: "Ordner-Inhalt in Foundry hochladen", resizable: true },
     position: { width: 500, height: "auto" }
   };
-
   async _renderHTML(context, options) {
     return `
       <div style="padding: 15px;">
@@ -120,11 +111,9 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
       </div>
     `;
   }
-
   _replaceHTML(html, newHTML, options) {
     super._replaceHTML(html, newHTML, options);
     const element = $(this.element);
-    
     element.find('.browse-btn').click(async (ev) => {
       new FilePicker({
         type: "folder",
@@ -132,14 +121,11 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
         callback: path => { element.find('#target-path').val(path); }
       }).browse();
     });
-
     element.find('#start-upload').click(async () => {
       const targetPath = element.find('#target-path').val();
       const files = element.find('#file-input')[0].files;
       if (!targetPath || files.length === 0) return ui.notifications.warn("Bitte Zielordner und Dateien auswählen!");
-
       ui.notifications.info(`Starte Upload von ${files.length} Dateien...`);
-
       for (let file of files) {
         const reader = new FileReader();
         reader.onload = async (e) => {
