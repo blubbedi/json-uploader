@@ -15,15 +15,17 @@ jobs:
       id: get_version
       run: echo "VERSION=$(node -p "require('./module.json').version")" >> $GITHUB_ENV
 
+    # Wechselt direkt in das Verzeichnis und zippt nur die nackten Dateien auf Root-Ebene
     - name: Zip Files
       run: |
-        zip -r ./module.json-uploader.zip . -x ".git/*" ".github/*"
+        zip -r ./json-uploader.zip module.json main.js
+        # Falls du Styles oder andere Ordner hättest, würden sie hier dazukommen
 
     - name: Update Release Assets
       uses: softprops/action-gh-release@v2
       with:
         files: |
           ./module.json
-          ./module.json-uploader.zip
+          ./json-uploader.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
