@@ -1,36 +1,22 @@
 // --- AUTO-REPARATUR FÜR KAPUTTE WELT-DATA-MODELS (V14) ---
 Hooks.on('preCreateItem', (document, data, options, userId) => {
-  if (document.id === "79NslkwJDqDkjTd6") {
-    document.updateSource({"system.target.template.size": 9});
-  }
-  if (document.id === "0cZmtnAIKAjvygU6") {
-    document.updateSource({"system.activities": {}});
-  }
+  if (document.id === "79NslkwJDqDkjTd6") document.updateSource({"system.target.template.size": 9});
+  if (document.id === "0cZmtnAIKAjvygU6") document.updateSource({"system.activities": {}});
 });
 
 Hooks.once('init', () => {
   const originalFromSource = CONFIG.Item.documentClass.fromSource;
   CONFIG.Item.documentClass.fromSource = function(source, options={}) {
-    // Fix für Item 1 (Bereits erfolgreich!)
     if (source._id === "79NslkwJDqDkjTd6" && source.system?.target?.template?.size === "9m") {
       source.system.target.template.size = 9;
-      console.log("JSON-Uploader: Item 1 im RAM geflickt!");
     }
-    
-    // JETZT VERBESSERT: Radikaler, pfadunabhängiger Tiefen-Fix für Item 2
     if (source._id === "0cZmtnAIKAjvygU6") {
-      // Wir löschen die kaputten Activities im RAM einfach komplett heraus, 
-      // damit dnd5e die Validierung klaglos schluckt.
-      if (source.system) {
-        source.system.activities = {};
-        console.log("JSON-Uploader: Kaputte V14-Activities für Item 2 im RAM komplett saniert!");
-      }
+      if (source.system) source.system.activities = {};
     }
-    
     return originalFromSource.call(this, source, options);
   };
 
-  // Socket-Registrierung bleibt absolut identisch
+  // Socket-Registrierung bleibt identisch
   game.socket.on('module.json-uploader', async (data) => {
     if (!game.user.isGM) return;
     if (data.action === "uploadMultiple") {
@@ -51,7 +37,7 @@ Hooks.once('init', () => {
   });
 });
 
-// --- UI INJEKTION ---
+// --- UI-INJEKTION (BRUTAL-MODE FÜR V14) ---
 Hooks.on('renderSceneControls', (controlsApp, html) => {
   if (!game.user.isGM) return;
 
@@ -75,33 +61,42 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
         onClick: () => { new JSONUploaderFormV14().render(true); },
         button: true
       });
-      
-      setTimeout(() => {
-        const subNav = document.querySelector('.main-controls [data-control="token"]');
-        if (subNav && !document.querySelector('[data-tool="json-uploader"]')) {
-          controlsApp.render(false);
-        }
-      }, 50);
     }
   }
+
+  // Sicherheitsnetz: Wir injizieren den Button direkt per DOM-Manipulation in die Leiste,
+  // falls Foundry wegen anderer Modul-Fehler das Neu-Rendern verweigert!
+  setTimeout(() => {
+    const subNav = document.querySelector('.main-controls [data-control="token"] .sub-controls');
+    if (subNav && !document.querySelector('[data-tool="json-uploader"]')) {
+      const activeClass = controlsApp.activeTool === "json-uploader" ? "active" : "";
+      const buttonHtml = `
+        <li class="control-tool ${activeClass}" data-tool="json-uploader" title="Ordner-Inhalt hochladen">
+          <i class="fas fa-folder-plus"></i>
+        </li>
+      `;
+      subNav.insertAdjacentHTML('beforeend', buttonHtml);
+      
+      // Event-Listener an das frisch erzwungene Icon hängen
+      const btnElement = subNav.querySelector('[data-tool="json-uploader"]');
+      if (btnElement) {
+        btnElement.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          new JSONUploaderFormV14().render(true);
+        });
+      }
+    }
+  }, 100);
 });
 
 // Offizielle Foundry V14 ApplicationV2 Implementierung
 class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
-  constructor(options={}) {
-    super(options);
-  }
+  constructor(options={}) { super(options); }
 
   static DEFAULT_OPTIONS = {
     id: "json-uploader-form",
-    window: {
-      title: "Ordner-Inhalt in Foundry hochladen",
-      resizable: true
-    },
-    position: {
-      width: 500,
-      height: "auto"
-    }
+    window: { title: "Ordner-Inhalt in Foundry hochladen", resizable: true },
+    position: { width: 500, height: "auto" }
   };
 
   async _renderHTML(context, options) {
