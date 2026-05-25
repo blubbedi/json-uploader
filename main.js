@@ -1,5 +1,5 @@
 Hooks.once('init', () => {
-  // Socket-Registrierung für den Server-Upload
+  // Socket-Registrierung bleibt absolut identisch
   game.socket.on('module.json-uploader', async (data) => {
     if (!game.user.isGM) return;
     if (data.action === "uploadMultiple") {
@@ -20,42 +20,48 @@ Hooks.once('init', () => {
   });
 });
 
-// Sicherer UI-Patch nach dem Laden aller Module
-Hooks.once('ready', () => {
+// Das absolute Sicherheitsnetz für V14: 
+// Jedes Mal, wenn Foundry die Steuerelemente zeichnet oder aktualisiert, 
+// klinken wir uns ein – völlig unabhängig davon, was andere Module davor getan haben.
+Hooks.on('renderSceneControls', (controlsApp, html) => {
   if (!game.user.isGM) return;
 
-  const patchV14Controls = () => {
-    const controlsApp = ui.controls;
-    if (!controlsApp || !controlsApp.controls) return;
+  const controlsStructure = controlsApp.controls;
+  if (!controlsStructure) return;
 
-    // V14 Kollektionen sicher auflösen
-    const list = typeof controlsApp.controls.values === 'function' 
-      ? Array.from(controlsApp.controls.values()) 
-      : Object.values(controlsApp.controls);
+  // Sicherstellen, dass wir eine durchsuchbare Liste haben
+  const list = typeof controlsStructure.values === 'function' 
+    ? Array.from(controlsStructure.values()) 
+    : Object.values(controlsStructure);
 
-    const tokenControls = list.find(c => c.name === "token");
-    
-    if (tokenControls && tokenControls.tools) {
-      const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
-      if (!alreadyExists) {
-        tokenControls.tools.push({
-          name: "json-uploader",
-          title: "Ordner-Inhalt hochladen",
-          icon: "fas fa-folder-plus",
-          visible: true,
-          onClick: () => { new JSONUploaderFormV14().render(true); },
-          button: true
-        });
-        controlsApp.render(true);
-      }
+  const tokenControls = list.find(c => c.name === "token");
+  
+  if (tokenControls && tokenControls.tools) {
+    const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
+    if (!alreadyExists) {
+      tokenControls.tools.push({
+        name: "json-uploader",
+        title: "Ordner-Inhalt hochladen",
+        icon: "fas fa-folder-plus",
+        visible: true,
+        onClick: () => { new JSONUploaderFormV14().render(true); },
+        button: true
+      });
+      
+      // Drücke das Icon direkt in das bereits gerenderte HTML-Element der UI, 
+      // falls Foundry das automatische Update verschläft.
+      setTimeout(() => {
+        const subNav = document.querySelector('.main-controls [data-control="token"]');
+        if (subNav && !document.querySelector('[data-tool="json-uploader"]')) {
+          // Zwingt die UI zu einem sauberen Refresh der Icons
+          controlsApp.render(false);
+        }
+      }, 50);
     }
-  };
-
-  patchV14Controls();
-  Hooks.on('renderSceneControls', () => patchV14Controls());
+  }
 });
 
-// Offizielle Foundry V14 ApplicationV2 Implementierung
+// Offizielle Foundry V14 ApplicationV2 Implementierung (Bleibt perfekt)
 class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   constructor(options={}) {
     super(options);
@@ -73,7 +79,6 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
     }
   };
 
-  // V14-Standardmethode zum Generieren des HTML-Inhalts
   async _renderHTML(context, options) {
     return `
       <div style="padding: 15px;">
@@ -95,10 +100,8 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
     `;
   }
 
-  // V14 Event-Listener Aktivierung
   _replaceHTML(html, newHTML, options) {
     super._replaceHTML(html, newHTML, options);
-    
     const element = $(this.element);
     
     element.find('.browse-btn').click(async (ev) => {
