@@ -4,31 +4,25 @@ Hooks.once('init', () => {
   console.log("JSON-UPLOADER: INITIALISIERE CORE-PATCHES");
   console.log("========================================");
 
-  // Wir patchen die fundamentale Datenbereinigung der Item-Klasse.
-  // Das läuft direkt beim Laden der DB-Einträge, noch bevor dnd5e das Schema prüft.
+  // Fängt kaputte DB-Einträge ab, bevor dnd5e sie validiert
   const originalCleanData = CONFIG.Item.documentClass.cleanData;
   CONFIG.Item.documentClass.cleanData = function(source, options={}) {
     if (source) {
-      // Fix für Item 1 (Größen-String "9m" zu valider Zahl konvertieren)
       if (source._id === "79NslkwJDqDkjTd6" || source.id === "79NslkwJDqDkjTd6") {
         if (source.system?.target?.template?.size === "9m") {
           source.system.target.template.size = 9;
-          console.log("JSON-Uploader: Daten-Fix für Item 1 (Größe) auf DB-Ebene angewendet!");
         }
       }
-      
-      // Fix für Item 2 (Kaputte Activities vollständig im RAM leeren, damit dnd5e nicht crasht)
       if (source._id === "0cZmtnAIKAjvygU6" || source.id === "0cZmtnAIKAjvygU6") {
         if (source.system) {
           source.system.activities = {};
-          console.log("JSON-Uploader: Daten-Fix für Item 2 (Activities) auf DB-Ebene angewendet!");
         }
       }
     }
     return originalCleanData.call(this, source, options);
   };
 
-  // Socket-Registrierung für den Upload-Prozess
+  // Backend Socket-Verarbeitung
   game.socket.on('module.json-uploader', async (data) => {
     if (!game.user.isGM) return;
     if (data.action === "uploadMultiple") {
@@ -49,14 +43,12 @@ Hooks.once('init', () => {
   });
 });
 
-// --- NATIVE V14 CONTROL BUTTON REGISTRIERUNG ---
-Hooks.on('getSceneControlButtons', (controls) => {
+// --- OFFIZIELLE V14 SCENECONTROLS INITIALISIERUNG ---
+// Dieser Hook läuft in V14 synchron bei der Strukturerstellung und fängt Timing-Verzögerungen ab.
+Hooks.on("initializeSceneControls", (controls) => {
   if (!game.user.isGM) return;
 
-  // V14 Kollektionen sicher auflösen
-  const list = Array.isArray(controls) ? controls : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
-  const tokenControls = list.find(c => c.name === "token");
-  
+  const tokenControls = controls.find(c => c.name === "token");
   if (tokenControls && tokenControls.tools) {
     const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
     if (!alreadyExists) {
@@ -70,38 +62,6 @@ Hooks.on('getSceneControlButtons', (controls) => {
       });
     }
   }
-});
-
-// Absolute DOM-Sicherheit, falls andere Module die Menüleiste asynchron blockieren
-Hooks.on('renderSceneControls', (controlsApp, html) => {
-  if (!game.user.isGM) return;
-  setTimeout(() => {
-    if (document.querySelector('[data-tool="json-uploader"]')) return;
-    const subNav = document.querySelector('[data-control="token"] .sub-controls, [data-control="token"] .control-tools, [data-control="token"] ul, .main-controls [data-control="token"]');
-    if (subNav) {
-      const activeClass = controlsApp.activeTool === "json-uploader" ? "active" : "";
-      const buttonHtml = `
-        <li class="control-tool ${activeClass}" data-tool="json-uploader" title="Ordner-Inhalt hochladen">
-          <i class="fas fa-folder-plus"></i>
-        </li>
-      `;
-      // Wenn es ein Listen-Element ist, hängen wir es an, andernfalls suchen wir die Unterliste
-      if (subNav.tagName === "UL" || subNav.classList.contains("sub-controls")) {
-        subNav.insertAdjacentHTML('beforeend', buttonHtml);
-      } else {
-        const ul = subNav.querySelector("ul, .sub-controls");
-        if (ul) ul.insertAdjacentHTML('beforeend', buttonHtml);
-      }
-      
-      const btnElement = document.querySelector('[data-tool="json-uploader"]');
-      if (btnElement) {
-        btnElement.addEventListener('click', (ev) => {
-          ev.preventDefault();
-          new JSONUploaderFormV14().render(true);
-        });
-      }
-    }
-  }, 200);
 });
 
 // Offizielle Foundry V14 ApplicationV2 Implementierung
