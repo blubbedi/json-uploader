@@ -1,4 +1,4 @@
-// VERSION 1.3.2 - V14 NATIVE RENDER FIX
+// VERSION 1.3.3 - COLLECTION-SAFE FIX
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
@@ -42,12 +42,17 @@ Hooks.once('init', () => {
   });
 });
 
-// --- OFFIZIELLER V14 INTERFACE HOOK ---
-// Wir nutzen den getSceneControlButtons Hook, da dieser in V14 die Datenstruktur direkt vor dem Rendern manipuliert.
-Hooks.on('getSceneControlButtons', (controls) => {
-  if (!game.user.isGM) return;
-
-  const tokenControls = controls.find(c => c.name === "token");
+// --- UI-INJEKTION (COLLECTION SIFTER) ---
+const injectUploaderButton = (controls) => {
+  if (!game.user.isGM || !controls) return;
+  
+  // Sicheres Auflösen unvollständiger Collection-Objekte oder Arrays
+  const list = Array.isArray(controls) 
+    ? controls 
+    : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
+    
+  const tokenControls = list.find(c => c && c.name === "token");
+  
   if (tokenControls && tokenControls.tools) {
     const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
     if (!alreadyExists) {
@@ -61,31 +66,26 @@ Hooks.on('getSceneControlButtons', (controls) => {
       });
     }
   }
-});
+};
 
-// Der ultimative DOM-Injektor als V14 Fallback, falls die Pipeline asynchron überschrieben wird
+Hooks.on("initializeSceneControls", (controls) => injectUploaderButton(controls));
+Hooks.on("getSceneControlButtons", (controls) => injectUploaderButton(controls));
+
+// DOM Fallback für asynchrone Overrides
 Hooks.on('renderSceneControls', (controlsApp, html) => {
   if (!game.user.isGM) return;
-  
-  // In V14 ist html ein HTMLElement (kein jQuery-Objekt mehr!)
-  const htmlElement = html[0] || html;
-  if (!htmlElement) return;
-
   setTimeout(() => {
     if (document.querySelector('[data-tool="json-uploader"]')) return;
-    
-    // Präziser V14 CSS-Selektor für die Token-Unterleiste
-    const tokenSubControls = document.querySelector('.main-controls [data-control="token"] ol.sub-controls, [data-control="token"] .sub-controls');
-    if (tokenSubControls) {
+    const subNav = document.querySelector('[data-control="token"] .sub-controls, [data-control="token"] .control-tools, [data-control="token"] ul, .main-controls [data-control="token"] ul');
+    if (subNav) {
       const activeClass = controlsApp.activeTool === "json-uploader" ? "active" : "";
       const buttonHtml = `
         <li class="control-tool ${activeClass}" data-tool="json-uploader" title="Ordner-Inhalt hochladen">
           <i class="fas fa-folder-plus"></i>
         </li>
       `;
-      tokenSubControls.insertAdjacentHTML('beforeend', buttonHtml);
-      
-      const btnElement = tokenSubControls.querySelector('[data-tool="json-uploader"]');
+      subNav.insertAdjacentHTML('beforeend', buttonHtml);
+      const btnElement = document.querySelector('[data-tool="json-uploader"]');
       if (btnElement) {
         btnElement.addEventListener('click', (ev) => {
           ev.preventDefault();
@@ -93,7 +93,7 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
         });
       }
     }
-  }, 300);
+  }, 250);
 });
 
 // Offizielle Foundry V14 ApplicationV2 Implementierung
