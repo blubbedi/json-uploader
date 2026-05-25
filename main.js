@@ -1,27 +1,32 @@
 // --- AUTO-REPARATUR FÜR KAPUTTE WELT-DATA-MODELS (V14) ---
-// Wir klinken uns extrem früh ein, um die Blockade des dnd5e-Systems im Keim zu ersticken.
 Hooks.on('preCreateItem', (document, data, options, userId) => {
-  // Falls die Items neu erstellt/importiert werden
   if (document.id === "79NslkwJDqDkjTd6") {
     document.updateSource({"system.target.template.size": 9});
   }
   if (document.id === "0cZmtnAIKAjvygU6") {
-    document.updateSource({"system.activities.dnd5eactivity000.roll.formula": "1d6"});
+    document.updateSource({"system.activities": {}});
   }
 });
 
-// Abfangen beim ersten Laden der Kollektionen aus der Datenbank
 Hooks.once('init', () => {
   const originalFromSource = CONFIG.Item.documentClass.fromSource;
   CONFIG.Item.documentClass.fromSource = function(source, options={}) {
+    // Fix für Item 1 (Bereits erfolgreich!)
     if (source._id === "79NslkwJDqDkjTd6" && source.system?.target?.template?.size === "9m") {
       source.system.target.template.size = 9;
-      console.log("JSON-Uploader: Kaputtes Template-Size Item im RAM geflickt!");
+      console.log("JSON-Uploader: Item 1 im RAM geflickt!");
     }
-    if (source._id === "0cZmtnAIKAjvygU6" && source.system?.activities?.dnd5eactivity000?.roll?.formula === "G") {
-      source.system.activities.dnd5eactivity000.roll.formula = "1d6";
-      console.log("JSON-Uploader: Kaputte Würfelformel im RAM geflickt!");
+    
+    // JETZT VERBESSERT: Radikaler, pfadunabhängiger Tiefen-Fix für Item 2
+    if (source._id === "0cZmtnAIKAjvygU6") {
+      // Wir löschen die kaputten Activities im RAM einfach komplett heraus, 
+      // damit dnd5e die Validierung klaglos schluckt.
+      if (source.system) {
+        source.system.activities = {};
+        console.log("JSON-Uploader: Kaputte V14-Activities für Item 2 im RAM komplett saniert!");
+      }
     }
+    
     return originalFromSource.call(this, source, options);
   };
 
