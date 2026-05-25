@@ -1,25 +1,34 @@
-// --- AUTO-REPARATUR FÜR KAPUTTE WELT-DATA-MODELS (V14) ---
-Hooks.on('preCreateItem', (document, data, options, userId) => {
-  if (document.id === "79NslkwJDqDkjTd6") document.updateSource({"system.target.template.size": 9});
-  if (document.id === "0cZmtnAIKAjvygU6") document.updateSource({"system.activities": {}});
-});
-
+// --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
-  console.log("JSON-UPLOADER: MODUL ERFOLGREICH GESTARTET!");
+  console.log("JSON-UPLOADER: INITIALISIERE CORE-PATCHES");
   console.log("========================================");
 
-  const originalFromSource = CONFIG.Item.documentClass.fromSource;
-  CONFIG.Item.documentClass.fromSource = function(source, options={}) {
-    if (source._id === "79NslkwJDqDkjTd6" && source.system?.target?.template?.size === "9m") {
-      source.system.target.template.size = 9;
+  // Wir patchen die fundamentale Datenbereinigung der Item-Klasse.
+  // Das läuft direkt beim Laden der DB-Einträge, noch bevor dnd5e das Schema prüft.
+  const originalCleanData = CONFIG.Item.documentClass.cleanData;
+  CONFIG.Item.documentClass.cleanData = function(source, options={}) {
+    if (source) {
+      // Fix für Item 1 (Größen-String "9m" zu valider Zahl konvertieren)
+      if (source._id === "79NslkwJDqDkjTd6" || source.id === "79NslkwJDqDkjTd6") {
+        if (source.system?.target?.template?.size === "9m") {
+          source.system.target.template.size = 9;
+          console.log("JSON-Uploader: Daten-Fix für Item 1 (Größe) auf DB-Ebene angewendet!");
+        }
+      }
+      
+      // Fix für Item 2 (Kaputte Activities vollständig im RAM leeren, damit dnd5e nicht crasht)
+      if (source._id === "0cZmtnAIKAjvygU6" || source.id === "0cZmtnAIKAjvygU6") {
+        if (source.system) {
+          source.system.activities = {};
+          console.log("JSON-Uploader: Daten-Fix für Item 2 (Activities) auf DB-Ebene angewendet!");
+        }
+      }
     }
-    if (source._id === "0cZmtnAIKAjvygU6" && source.system) {
-      source.system.activities = {};
-    }
-    return originalFromSource.call(this, source, options);
+    return originalCleanData.call(this, source, options);
   };
 
+  // Socket-Registrierung für den Upload-Prozess
   game.socket.on('module.json-uploader', async (data) => {
     if (!game.user.isGM) return;
     if (data.action === "uploadMultiple") {
@@ -40,11 +49,14 @@ Hooks.once('init', () => {
   });
 });
 
-// --- UI-INJEKTION (KOMBINIERTER METHODEN-MIX FÜR V14) ---
+// --- NATIVE V14 CONTROL BUTTON REGISTRIERUNG ---
 Hooks.on('getSceneControlButtons', (controls) => {
   if (!game.user.isGM) return;
+
+  // V14 Kollektionen sicher auflösen
   const list = Array.isArray(controls) ? controls : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
   const tokenControls = list.find(c => c.name === "token");
+  
   if (tokenControls && tokenControls.tools) {
     const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
     if (!alreadyExists) {
@@ -60,11 +72,12 @@ Hooks.on('getSceneControlButtons', (controls) => {
   }
 });
 
+// Absolute DOM-Sicherheit, falls andere Module die Menüleiste asynchron blockieren
 Hooks.on('renderSceneControls', (controlsApp, html) => {
   if (!game.user.isGM) return;
   setTimeout(() => {
     if (document.querySelector('[data-tool="json-uploader"]')) return;
-    const subNav = document.querySelector('[data-control="token"] .sub-controls, [data-control="token"] .control-tools, [data-control="token"] ul');
+    const subNav = document.querySelector('[data-control="token"] .sub-controls, [data-control="token"] .control-tools, [data-control="token"] ul, .main-controls [data-control="token"]');
     if (subNav) {
       const activeClass = controlsApp.activeTool === "json-uploader" ? "active" : "";
       const buttonHtml = `
@@ -72,8 +85,15 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
           <i class="fas fa-folder-plus"></i>
         </li>
       `;
-      subNav.insertAdjacentHTML('beforeend', buttonHtml);
-      const btnElement = subNav.querySelector('[data-tool="json-uploader"]');
+      // Wenn es ein Listen-Element ist, hängen wir es an, andernfalls suchen wir die Unterliste
+      if (subNav.tagName === "UL" || subNav.classList.contains("sub-controls")) {
+        subNav.insertAdjacentHTML('beforeend', buttonHtml);
+      } else {
+        const ul = subNav.querySelector("ul, .sub-controls");
+        if (ul) ul.insertAdjacentHTML('beforeend', buttonHtml);
+      }
+      
+      const btnElement = document.querySelector('[data-tool="json-uploader"]');
       if (btnElement) {
         btnElement.addEventListener('click', (ev) => {
           ev.preventDefault();
@@ -81,16 +101,19 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
         });
       }
     }
-  }, 150);
+  }, 200);
 });
 
+// Offizielle Foundry V14 ApplicationV2 Implementierung
 class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   constructor(options={}) { super(options); }
+  
   static DEFAULT_OPTIONS = {
     id: "json-uploader-form",
     window: { title: "Ordner-Inhalt in Foundry hochladen", resizable: true },
     position: { width: 500, height: "auto" }
   };
+  
   async _renderHTML(context, options) {
     return `
       <div style="padding: 15px;">
@@ -111,6 +134,7 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
       </div>
     `;
   }
+  
   _replaceHTML(html, newHTML, options) {
     super._replaceHTML(html, newHTML, options);
     const element = $(this.element);
