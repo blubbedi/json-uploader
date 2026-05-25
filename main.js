@@ -1,4 +1,4 @@
-// VERSION 1.3.3 - COLLECTION-SAFE FIX
+// VERSION 1.3.4 - ASYNC TIMING & DOM INJECTION FIX
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
@@ -42,17 +42,11 @@ Hooks.once('init', () => {
   });
 });
 
-// --- UI-INJEKTION (COLLECTION SIFTER) ---
+// --- UI-INJEKTION (NATIVE & REAKTIVE STRATEGIE) ---
 const injectUploaderButton = (controls) => {
   if (!game.user.isGM || !controls) return;
-  
-  // Sicheres Auflösen unvollständiger Collection-Objekte oder Arrays
-  const list = Array.isArray(controls) 
-    ? controls 
-    : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
-    
+  const list = Array.isArray(controls) ? controls : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
   const tokenControls = list.find(c => c && c.name === "token");
-  
   if (tokenControls && tokenControls.tools) {
     const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
     if (!alreadyExists) {
@@ -71,12 +65,16 @@ const injectUploaderButton = (controls) => {
 Hooks.on("initializeSceneControls", (controls) => injectUploaderButton(controls));
 Hooks.on("getSceneControlButtons", (controls) => injectUploaderButton(controls));
 
-// DOM Fallback für asynchrone Overrides
+// Der reaktive DOM-Injektor: Falls Foundry das Icon beim asynchronen Laden vergisst,
+// drücken wir es hart in das gerenderte HTML-Element, sobald das Token-Menü aktiv ist.
 Hooks.on('renderSceneControls', (controlsApp, html) => {
   if (!game.user.isGM) return;
-  setTimeout(() => {
+
+  const performInjection = () => {
     if (document.querySelector('[data-tool="json-uploader"]')) return;
-    const subNav = document.querySelector('[data-control="token"] .sub-controls, [data-control="token"] .control-tools, [data-control="token"] ul, .main-controls [data-control="token"] ul');
+
+    // In V14 suchen wir die aktive Werkzeugleiste für Token-Steuerelemente
+    const subNav = document.querySelector('.main-controls [data-control="token"] ol.sub-controls, [data-control="token"] .sub-controls, [data-control="token"] ul');
     if (subNav) {
       const activeClass = controlsApp.activeTool === "json-uploader" ? "active" : "";
       const buttonHtml = `
@@ -85,15 +83,23 @@ Hooks.on('renderSceneControls', (controlsApp, html) => {
         </li>
       `;
       subNav.insertAdjacentHTML('beforeend', buttonHtml);
+      
       const btnElement = document.querySelector('[data-tool="json-uploader"]');
       if (btnElement) {
         btnElement.addEventListener('click', (ev) => {
           ev.preventDefault();
+          ev.stopPropagation();
           new JSONUploaderFormV14().render(true);
         });
       }
     }
-  }, 250);
+  };
+
+  // Wir führen es sofort aus und setzen zusätzlich einen kurzen Intervall-Sicherheitsanker,
+  // um asynchrone Overrides durch schwere Grafik- oder UI-Module abzufangen.
+  performInjection();
+  setTimeout(performInjection, 200);
+  setTimeout(performInjection, 750);
 });
 
 // Offizielle Foundry V14 ApplicationV2 Implementierung
