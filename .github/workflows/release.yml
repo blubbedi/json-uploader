@@ -14,16 +14,16 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v4
 
-    # Packt die Dateien flach direkt als module.zip
-    - name: Missing Files Fix (Zip)
-      uses: theunites/zip-action@v2.2.0
-      with:
-        files: |
-          module.json
-          main.js
-        dest: ./module.zip
+    - name: Get Version
+      id: get_version
+      run: echo "VERSION=$(node -p "require('./module.json').version")" >> $GITHUB_ENV
 
-    # Erstellt das Release und lädt module.json sowie module.zip hoch
+    # Nutzt den eingebauten Linux-Befehl, steuert aber die Dateien direkt an
+    # Dadurch bleibt die ZIP-Struktur absolut flach, wie Foundry es will
+    - name: Create Flat Zip
+      run: |
+        zip -j ./module.zip ./module.json ./main.js
+
     - name: Create and Update Release
       uses: softprops/action-gh-release@v2
       with:
