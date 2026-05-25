@@ -1,14 +1,15 @@
 name: Release Creation
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*' # Reagiert automatisch, wenn ein Tag hochgeladen wird (z.B. v1.0.2)
 
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # ZWINGEND ERFORDERLICH, damit GitHub die Dateien hochladen darf
+      contents: write
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -21,9 +22,14 @@ jobs:
       run: |
         zip -r ./json-uploader.zip module.json main.js
 
-    - name: Update Release Assets
+    # Erstellt jetzt das Release AUTOMATISCH und lädt die Dateien hoch
+    - name: Create and Update Release
       uses: softprops/action-gh-release@v2
       with:
+        tag_name: ${{ github.ref_name }}
+        name: Release ${{ github.ref_name }}
+        draft: false
+        prerelease: false
         files: |
           ./module.json
           ./json-uploader.zip
