@@ -1,8 +1,8 @@
-// VERSION 1.4.2 - APPLICATION V2 CONTENT RENDER FIX
+// VERSION 1.4.3 - APPLICATION V2 CONTENT FORCE BUILD
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
-  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V1.4.2)");
+  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V1.4.3)");
   console.log("========================================");
 
   const originalCleanData = CONFIG.Item.documentClass.cleanData;
@@ -66,7 +66,7 @@ const injectUploaderButton = (controls) => {
 Hooks.on("initializeSceneControls", (controls) => injectUploaderButton(controls));
 Hooks.on("getSceneControlButtons", (controls) => injectUploaderButton(controls));
 
-// --- DER MUTATION OBSERVER FÜR UI-PERSISTENZ ---
+// --- MUTATION OBSERVER FÜR UI-PERSISTENZ ---
 Hooks.once('ready', () => {
   if (!game.user.isGM) return;
 
@@ -102,7 +102,7 @@ Hooks.once('ready', () => {
   forceButtonInjection();
 });
 
-// Offizielle Foundry V14 ApplicationV2 Implementierung (Reines HTML5-DOM)
+// Offizielle, vollkonforme Foundry V14 ApplicationV2 Implementierung
 class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   constructor(options={}) { super(options); }
   
@@ -111,57 +111,59 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
     window: { title: "Ordner-Inhalt in Foundry hochladen", resizable: true },
     position: { width: 500, height: "auto" }
   };
-  
-  // V14-Spezifikation: Muss ein HTMLElement zurückgeben oder ein kompiliertes HTML-Element via DOMParser
+
+  // V14 verlangt im neuen Framework zwingend ein HTML-Template-String oder Fragment über den internen Render-Lebenszyklus
   async _renderHTML(context, options) {
-    const rawHtml = `
-      <div style="padding: 15px;">
-        <p>Wähle den Zielordner im Foundry-Server aus und markiere die Dateien von deinem PC.</p>
-        <hr>
+    return `
+      <div class="json-uploader-content" style="padding: 15px;">
+        <p style="margin-bottom: 10px;">Wähle den Zielordner im Foundry-Server aus und markiere die Dateien von deinem PC.</p>
+        <hr style="margin-bottom: 15px;">
         <div class="form-group" style="margin-bottom: 15px;">
-          <label><b>1. Zielordner auf dem Foundry-Server:</b></label>
-          <div class="form-fields" style="display: flex; gap: 5px; margin-top: 5px;">
-            <input type="text" id="target-path" placeholder="data/modules/ziel-modul/ordner" style="flex: 1;">
-            <button type="button" class="browse-btn" style="flex: 0 0 40px;"><i class="fas fa-folder-open"></i></button>
+          <label style="display: block; font-weight: bold; margin-bottom: 5px;">1. Zielordner auf dem Foundry-Server:</label>
+          <div class="form-fields" style="display: flex; gap: 5px;">
+            <input type="text" id="target-path" placeholder="data/modules/ziel-modul/ordner" style="flex: 1; padding: 4px;">
+            <button type="button" class="browse-btn" style="flex: 0 0 40px; cursor: pointer;"><i class="fas fa-folder-open"></i></button>
           </div>
         </div>
         <div class="form-group" style="margin-bottom: 20px;">
-          <label><b>2. Dateien vom PC (z.B. .jpg und .json zusammen markieren):</b></label>
-          <input type="file" id="file-input" multiple style="margin-top: 5px; display: block;">
+          <label style="display: block; font-weight: bold; margin-bottom: 5px;">2. Dateien vom PC (z.B. .jpg und .json zusammen markieren):</label>
+          <input type="file" id="file-input" multiple style="display: block; width: 100%;">
         </div>
-        <button type="button" id="start-upload" style="width: 100%; font-weight: bold; padding: 8px;"><i class="fas fa-cloud-upload-alt"></i> Alle Dateien hochladen</button>
+        <button type="button" id="start-upload" style="width: 100%; font-weight: bold; padding: 8px; cursor: pointer;"><i class="fas fa-cloud-upload-alt"></i> Alle Dateien hochladen</button>
       </div>
     `;
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(rawHtml, 'text/html');
-    return doc.body.firstElementChild; // Gibt ein echtes HTMLElement an die V14-Engine weiter
   }
-  
+
+  // Dieser Schritt injiziert den gerenderten Inhalt direkt in das von ApplicationV2 erzeugte Fenster-Innere (window.content)
   _replaceHTML(html, newHTML, options) {
-    super._replaceHTML(html, newHTML, options);
-    const element = this.element; 
+    const contentContainer = this.window.content || this.element;
+    if (!contentContainer) return;
     
-    // Event-Listener für den FilePicker-Ordner-Button
-    const browseBtn = element.querySelector('.browse-btn');
+    // HTML sicher einsetzen
+    contentContainer.innerHTML = html;
+
+    // Listener an die frisch gerenderten DOM-Elemente binden
+    const browseBtn = contentContainer.querySelector('.browse-btn');
     if (browseBtn) {
       browseBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
         new FilePicker({
           type: "folder",
           current: "data/",
           callback: path => { 
-            const input = element.querySelector('#target-path');
+            const input = contentContainer.querySelector('#target-path');
             if (input) input.value = path; 
           }
         }).browse();
       });
     }
 
-    // Event-Listener für den Upload-Button
-    const uploadBtn = element.querySelector('#start-upload');
+    const uploadBtn = contentContainer.querySelector('#start-upload');
     if (uploadBtn) {
-      uploadBtn.addEventListener('click', async () => {
-        const targetPath = element.querySelector('#target-path')?.value;
-        const fileInput = element.querySelector('#file-input');
+      uploadBtn.addEventListener('click', async (ev) => {
+        ev.preventDefault();
+        const targetPath = contentContainer.querySelector('#target-path')?.value;
+        const fileInput = contentContainer.querySelector('#file-input');
         const files = fileInput ? fileInput.files : [];
         
         if (!targetPath || files.length === 0) return ui.notifications.warn("Bitte Zielordner und Dateien auswählen!");
