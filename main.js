@@ -1,8 +1,8 @@
-// VERSION 1.2.0 - BACK TO INDEPENDENT PIPELINE
+// VERSION 1.4.0 - PRODUCTION STABLE
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
-  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V120)");
+  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V1.4.0)");
   console.log("========================================");
 
   const originalCleanData = CONFIG.Item.documentClass.cleanData;
