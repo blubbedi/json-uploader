@@ -1,4 +1,4 @@
-// VERSION 1.3.5 - REKURSIVER DOM OBSERVER FIX
+// VERSION 1.3.6 - FINAL PRODUCTION BUILD
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
@@ -65,8 +65,7 @@ const injectUploaderButton = (controls) => {
 Hooks.on("initializeSceneControls", (controls) => injectUploaderButton(controls));
 Hooks.on("getSceneControlButtons", (controls) => injectUploaderButton(controls));
 
-// --- DER UNZERSTÖRBARE MUTATION OBSERVER (V14) ---
-// Überwacht den HTML-Körper der Foundry-Leiste. Wenn dnd5e uns löscht, injizieren wir sofort nach.
+// --- DER MUTATION OBSERVER GEGEN ASYNC OVERRIDES ---
 Hooks.once('ready', () => {
   if (!game.user.isGM) return;
 
@@ -93,7 +92,6 @@ Hooks.once('ready', () => {
     }
   };
 
-  // Starte den Wächter auf dem Interface-Layer von Foundry
   const observer = new MutationObserver(() => forceButtonInjection());
   const uiControlsElement = document.getElementById('ui-left');
   
@@ -101,11 +99,10 @@ Hooks.once('ready', () => {
     observer.observe(uiControlsElement, { childList: true, subtree: true });
   }
   
-  // Erstinjektion zur Sicherheit
   forceButtonInjection();
 });
 
-// Offizielle Foundry V14 ApplicationV2 Implementierung
+// Offizielle Foundry V14 ApplicationV2 Implementierung (Reines HTML5-DOM)
 class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   constructor(options={}) { super(options); }
   
@@ -138,47 +135,62 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   
   _replaceHTML(html, newHTML, options) {
     super._replaceHTML(html, newHTML, options);
-    const element = $(this.element);
-    element.find('.browse-btn').click(async (ev) => {
-      new FilePicker({
-        type: "folder",
-        current: "data/",
-        callback: path => { element.find('#target-path').val(path); }
-      }).browse();
-    });
-    element.find('#start-upload').click(async () => {
-      const targetPath = element.find('#target-path').val();
-      const files = element.find('#file-input')[0].files;
-      if (!targetPath || files.length === 0) return ui.notifications.warn("Bitte Zielordner und Dateien auswählen!");
-      ui.notifications.info(`Starte Upload von ${files.length} Dateien...`);
-      for (let file of files) {
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const content = e.target.result;
-          game.socket.emit('module.json-uploader', {
-            action: "uploadMultiple",
-            filename: file.name,
-            targetPath: targetPath,
-            content: content
-          });
-          try {
-            let fileObj;
-            if (file.name.endsWith('.json')) {
-              fileObj = new File([content], file.name, { type: "application/json" });
-            } else {
-              const response = await fetch(content);
-              const blob = await response.blob();
-              fileObj = new File([blob], file.name, { type: file.type });
-            }
-            await FilePicker.upload("data", targetPath, fileObj, {});
-          } catch (err) {
-            ui.notifications.error(`Fehler bei ${file.name}: ${err.message}`);
+    const element = this.element; // Natives HTMLElement in ApplicationV2
+    
+    const browseBtn = element.querySelector('.browse-btn');
+    if (browseBtn) {
+      browseBtn.addEventListener('click', async (ev) => {
+        new FilePicker({
+          type: "folder",
+          current: "data/",
+          callback: path => { 
+            const input = element.querySelector('#target-path');
+            if (input) input.value = path; 
           }
-        };
-        if (file.name.endsWith('.json')) { reader.readAsText(file); } else { reader.readAsDataURL(file); }
-      }
-      ui.notifications.info("Upload abgeschlossen!");
-      this.close();
-    });
+        }).browse();
+      });
+    }
+
+    const uploadBtn = element.querySelector('#start-upload');
+    if (uploadBtn) {
+      uploadBtn.addEventListener('click', async () => {
+        const targetPath = element.querySelector('#target-path')?.value;
+        const fileInput = element.querySelector('#file-input');
+        const files = fileInput ? fileInput.files : [];
+        
+        if (!targetPath || files.length === 0) return ui.notifications.warn("Bitte Zielordner und Dateien auswählen!");
+
+        ui.notifications.info(`Starte Upload von ${files.length} Dateien...`);
+
+        for (let file of files) {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            const content = e.target.result;
+            game.socket.emit('module.json-uploader', {
+              action: "uploadMultiple",
+              filename: file.name,
+              targetPath: targetPath,
+              content: content
+            });
+            try {
+              let fileObj;
+              if (file.name.endsWith('.json')) {
+                fileObj = new File([content], file.name, { type: "application/json" });
+              } else {
+                const response = await fetch(content);
+                const blob = await response.blob();
+                fileObj = new File([blob], file.name, { type: file.type });
+              }
+              await FilePicker.upload("data", targetPath, fileObj, {});
+            } catch (err) {
+              ui.notifications.error(`Fehler bei ${file.name}: ${err.message}`);
+            }
+          };
+          if (file.name.endsWith('.json')) { reader.readAsText(file); } else { reader.readAsDataURL(file); }
+        }
+        ui.notifications.info("Upload abgeschlossen!");
+        this.close();
+      });
+    }
   }
 }
