@@ -1,8 +1,8 @@
-// VERSION 1.4.0 - PRODUCTION STABLE
+// VERSION 1.4.1 - GLOBAL EXPORT BUILD
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
-  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V1.4.0)");
+  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V1.4.1)");
   console.log("========================================");
 
   const originalCleanData = CONFIG.Item.documentClass.cleanData;
@@ -194,3 +194,6 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
     }
   }
 }
+
+// HIER IST DER ENTSCHEIDENDE FIX: Die Klasse global für Makros und Konsole freigeben!
+window.JSONUploaderFormV14 = JSONUploaderFormV14;
