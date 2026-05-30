@@ -1,8 +1,8 @@
-// VERSION 1.3.6 - FINAL PRODUCTION BUILD
+// VERSION 1.2.0 - BACK TO INDEPENDENT PIPELINE
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
-  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH");
+  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V120)");
   console.log("========================================");
 
   const originalCleanData = CONFIG.Item.documentClass.cleanData;
@@ -42,15 +42,16 @@ Hooks.once('init', () => {
   });
 });
 
-// --- UI-INJEKTION VIA NATIVE HOOKS ---
+// --- UI-INJEKTION IN DIE GLOBALEN STEUERELEMENTE ---
 const injectUploaderButton = (controls) => {
   if (!game.user.isGM || !controls) return;
+  
   const list = Array.isArray(controls) ? controls : (typeof controls.values === 'function' ? Array.from(controls.values()) : Object.values(controls));
-  const tokenControls = list.find(c => c && c.name === "token");
-  if (tokenControls && tokenControls.tools) {
-    const alreadyExists = tokenControls.tools.some(t => t.name === "json-uploader");
+  const mainControls = list.find(c => c && c.name === "main");
+  if (mainControls && mainControls.tools) {
+    const alreadyExists = mainControls.tools.some(t => t.name === "json-uploader");
     if (!alreadyExists) {
-      tokenControls.tools.push({
+      mainControls.tools.push({
         name: "json-uploader",
         title: "Ordner-Inhalt hochladen",
         icon: "fas fa-folder-plus",
@@ -65,21 +66,21 @@ const injectUploaderButton = (controls) => {
 Hooks.on("initializeSceneControls", (controls) => injectUploaderButton(controls));
 Hooks.on("getSceneControlButtons", (controls) => injectUploaderButton(controls));
 
-// --- DER MUTATION OBSERVER GEGEN ASYNC OVERRIDES ---
+// --- DER MUTATION OBSERVER FÜR STABILE SICHERHEIT ---
 Hooks.once('ready', () => {
   if (!game.user.isGM) return;
 
   const forceButtonInjection = () => {
     if (document.querySelector('[data-tool="json-uploader"]')) return;
 
-    const subNav = document.querySelector('.main-controls [data-control="token"] ol.sub-controls, [data-control="token"] .sub-controls, [data-control="token"] ul');
-    if (subNav) {
+    const mainNav = document.querySelector('.main-controls, #controls ul.main-controls');
+    if (mainNav) {
       const buttonHtml = `
         <li class="control-tool" data-tool="json-uploader" title="Ordner-Inhalt hochladen">
           <i class="fas fa-folder-plus"></i>
         </li>
       `;
-      subNav.insertAdjacentHTML('beforeend', buttonHtml);
+      mainNav.insertAdjacentHTML('beforeend', buttonHtml);
       
       const btnElement = document.querySelector('[data-tool="json-uploader"]');
       if (btnElement) {
@@ -94,7 +95,6 @@ Hooks.once('ready', () => {
 
   const observer = new MutationObserver(() => forceButtonInjection());
   const uiControlsElement = document.getElementById('ui-left');
-  
   if (uiControlsElement) {
     observer.observe(uiControlsElement, { childList: true, subtree: true });
   }
@@ -135,7 +135,7 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   
   _replaceHTML(html, newHTML, options) {
     super._replaceHTML(html, newHTML, options);
-    const element = this.element; // Natives HTMLElement in ApplicationV2
+    const element = this.element; 
     
     const browseBtn = element.querySelector('.browse-btn');
     if (browseBtn) {
