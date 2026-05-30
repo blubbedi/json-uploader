@@ -1,8 +1,8 @@
-// VERSION 1.4.1 - GLOBAL EXPORT BUILD
+// VERSION 1.4.2 - APPLICATION V2 CONTENT RENDER FIX
 // --- CORE-DATEN-SANIERUNG VOR JEDER VALIDIERUNG (V14) ---
 Hooks.once('init', () => {
   console.log("========================================");
-  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V1.4.1)");
+  console.log("JSON-UPLOADER: CORE-REGISTRIERUNG ERFOLGREICH (V1.4.2)");
   console.log("========================================");
 
   const originalCleanData = CONFIG.Item.documentClass.cleanData;
@@ -66,7 +66,7 @@ const injectUploaderButton = (controls) => {
 Hooks.on("initializeSceneControls", (controls) => injectUploaderButton(controls));
 Hooks.on("getSceneControlButtons", (controls) => injectUploaderButton(controls));
 
-// --- DER MUTATION OBSERVER FÜR STABILE SICHERHEIT ---
+// --- DER MUTATION OBSERVER FÜR UI-PERSISTENZ ---
 Hooks.once('ready', () => {
   if (!game.user.isGM) return;
 
@@ -112,8 +112,9 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
     position: { width: 500, height: "auto" }
   };
   
+  // V14-Spezifikation: Muss ein HTMLElement zurückgeben oder ein kompiliertes HTML-Element via DOMParser
   async _renderHTML(context, options) {
-    return `
+    const rawHtml = `
       <div style="padding: 15px;">
         <p>Wähle den Zielordner im Foundry-Server aus und markiere die Dateien von deinem PC.</p>
         <hr>
@@ -131,12 +132,16 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
         <button type="button" id="start-upload" style="width: 100%; font-weight: bold; padding: 8px;"><i class="fas fa-cloud-upload-alt"></i> Alle Dateien hochladen</button>
       </div>
     `;
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+    return doc.body.firstElementChild; // Gibt ein echtes HTMLElement an die V14-Engine weiter
   }
   
   _replaceHTML(html, newHTML, options) {
     super._replaceHTML(html, newHTML, options);
     const element = this.element; 
     
+    // Event-Listener für den FilePicker-Ordner-Button
     const browseBtn = element.querySelector('.browse-btn');
     if (browseBtn) {
       browseBtn.addEventListener('click', async (ev) => {
@@ -151,6 +156,7 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
       });
     }
 
+    // Event-Listener für den Upload-Button
     const uploadBtn = element.querySelector('#start-upload');
     if (uploadBtn) {
       uploadBtn.addEventListener('click', async () => {
@@ -195,5 +201,5 @@ class JSONUploaderFormV14 extends foundry.applications.api.ApplicationV2 {
   }
 }
 
-// HIER IST DER ENTSCHEIDENDE FIX: Die Klasse global für Makros und Konsole freigeben!
+// Global freigeben für Makros und Konsole
 window.JSONUploaderFormV14 = JSONUploaderFormV14;
